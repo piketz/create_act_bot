@@ -1,5 +1,5 @@
 import telebot
-from telebot import types
+from telebot import types, apihelper
 import jinja2
 import pdfkit
 from datetime import datetime
@@ -12,6 +12,7 @@ import logging
 import platform
 from dotenv import load_dotenv
 
+
 logging.basicConfig(level=logging.INFO, filename="py_log.log", filemode="w")
 
 # Инициализация бота
@@ -19,6 +20,8 @@ dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
 if os.path.exists(dotenv_path):
     load_dotenv(dotenv_path)
 
+apihelper.ENABLE_MIDDLEWARE = True
+apihelper.SESSION_TIME_TO_LIVE = 5 * 60
 bot = telebot.TeleBot(os.environ.get('API_KEY'))
 
 if platform.system() == 'Linux':
@@ -26,10 +29,9 @@ if platform.system() == 'Linux':
 else:
     wkhtmltopdf = './wkhtmltopdf.exe'
 
-downloads_folder = 'downloads'
+downloads_folder= 'downloads'
 generated_folder = 'files'
 max_folder_size = 1000 * 1024 * 1024  # 1000 МБ в байтах
-
 
 def generate_documents(exelfile, operation, fio_ispolnitel, day, month, year):
     # Загрузка данных из файла Excel
@@ -58,7 +60,7 @@ def generate_documents(exelfile, operation, fio_ispolnitel, day, month, year):
             name_file = f"{index_ops}_{str(row['NumberIn'])}_{str(row['Number'])}_{str(row['Задание']).replace('/', '-')}"
 
             # Создание контекста для заполнения шаблона
-            context = {'name_file': name_file,
+            context = {'name_file':name_file,
                        'fio_ispolnitel': fio_ispolnitel,
                        'day': day,
                        'month': month,
@@ -74,7 +76,7 @@ def generate_documents(exelfile, operation, fio_ispolnitel, day, month, year):
                        'num_im': str(row['Number'])}
 
             file_path = one_pdf_crt(context)
-            # logging.info(f'one_pdf_crt(context)  = {file_path}')
+            #logging.info(f'one_pdf_crt(context)  = {file_path}')
             generated_docs.append(file_path)
         except Exception as e:
             logging.error(f"Error processing row: {e}")
@@ -82,7 +84,6 @@ def generate_documents(exelfile, operation, fio_ispolnitel, day, month, year):
 
     logging.info(f'return generated_docs = {generated_docs}')
     return generated_docs
-
 
 def one_pdf_crt(context):
     template_loader = jinja2.FileSystemLoader('./')
@@ -98,7 +99,6 @@ def one_pdf_crt(context):
 
     return pdf_path
 
-
 # Обработчик команды /start
 @bot.message_handler(commands=['start'])
 def start(message):
@@ -107,7 +107,6 @@ def start(message):
     markup.add(item)
     bot.send_message(message.chat.id, "Привет! Я бот для загрузки Excel-файлов. Нажмите кнопку, чтобы загрузить файл.",
                      reply_markup=markup)
-
 
 # Обработчик текстовых сообщений
 @bot.message_handler(content_types=['text'])
@@ -119,7 +118,6 @@ def handle_text(message):
                                           "Конфигурационная единица ")
     else:
         bot.send_message(message.chat.id, "Я понимаю только команду 'Загрузить Excel файл'.")
-
 
 # Обработчик загрузки документов (Excel-файлов)
 @bot.message_handler(content_types=['document'])
@@ -137,8 +135,7 @@ def handle_document(message):
             os.makedirs(downloads_folder)
 
         if file_info.file_size > 20 * 1024 * 1024:
-            bot.send_message(message.chat.id,
-                             "Размер файла превышает 200MB. Пожалуйста, загрузите файл размером не более 20MB.")
+            bot.send_message(message.chat.id, "Размер файла превышает 200MB. Пожалуйста, загрузите файл размером не более 20MB.")
             return
         else:
             with open(file_path, 'wb') as new_file:
@@ -147,7 +144,7 @@ def handle_document(message):
 
             # Здесь можно добавить код для запроса дополнительных данных
             bot.send_message(message.chat.id, "Пожалуйста, укажите дату в формате 01.01.2023. "
-                                              "Если ввести некорректные данные то поле даты будет пустым")
+                                          "Если ввести некорректные данные то поле даты будет пустым")
             bot.register_next_step_handler(message, ask_for_date, file_path)
     else:
         bot.send_message(message.chat.id, "Пожалуйста, отправьте файл в формате Excel (xlsx).")
@@ -156,7 +153,7 @@ def handle_document(message):
 # Функция для запроса даты
 def ask_for_date(message, file_path):
     date_str = message.text
-    if date_str == None:
+    if date_str==None:
         bot.register_next_step_handler(message, ask_for_date, file_path)
     else:
         try:
@@ -170,22 +167,20 @@ def ask_for_date(message, file_path):
         bot.send_message(message.chat.id, "Спасибо! Теперь укажите оказанные услуги (Замена ФН, ТО...):")
         bot.register_next_step_handler(message, ask_for_operation, file_path, date)
 
-
 # Функция для запроса operation
 def ask_for_operation(message, file_path, date):
     operation = message.text
-    if operation == None:
+    if operation==None:
         bot.register_next_step_handler(message, ask_for_operation, file_path, date)
     else:
         # Здесь можно сохранить полученную дату и запросить следующую информацию, например, ФИО
         bot.send_message(message.chat.id, "Спасибо! Теперь укажите ФИО исполнителя:")
         bot.register_next_step_handler(message, ask_for_name, file_path, date, operation)
 
-
 # Функция для запроса ФИО
-def ask_for_name(message, file_path, date, operation):
+def ask_for_name(message, file_path, date,operation):
     fio_ispolnitel = message.text
-    if fio_ispolnitel == None:
+    if fio_ispolnitel==None:
         bot.register_next_step_handler(message, ask_for_name, file_path, date, operation)
     else:
         if date:
@@ -231,7 +226,6 @@ def ask_for_name(message, file_path, date, operation):
             bot.send_document(message.chat.id, open(merged_pdf_file, 'rb'))
             bot.send_message(message.chat.id, f"PDF с данными создан и отправлен. Готовы обработать ещё один файл?")
 
-
 def remove_file(folder_path):
     folder_content = os.listdir(folder_path)
     folder_content.sort(key=lambda x: os.path.getmtime(os.path.join(folder_path, x)))
@@ -242,7 +236,6 @@ def remove_file(folder_path):
     for file, _ in oldest_files:
         os.remove(os.path.join(folder_path, file))
 
-
 def get_folder_size(folder_path):
     total_size = 0
     for path, dirs, files in os.walk(folder_path):
@@ -251,11 +244,10 @@ def get_folder_size(folder_path):
             total_size += os.path.getsize(file_path)
     return total_size
 
-
 # Запуск бота
 if __name__ == '__main__':
     if get_folder_size(downloads_folder) > max_folder_size:  remove_file(downloads_folder)
     if get_folder_size(generated_folder) > max_folder_size:  remove_file(generated_folder)
 
     logging.info('Run..')
-    bot.polling(none_stop=True)
+    bot.polling(none_stop=True, timeout=30)
