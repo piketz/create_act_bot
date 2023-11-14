@@ -11,6 +11,9 @@ COPY requirements.txt /app/requirements.txt
 
 WORKDIR /app
 
+ENV GPG_KEY E3FF2839C048B25C084DEBE9B26995E310250568
+ENV PYTHON_VERSION 3.9.18
+
 
 RUN pip install -r /app/requirements.txt
 ENV PYTHONPATH=/app
