@@ -23,11 +23,12 @@ if os.path.exists(dotenv_path):
 apihelper.ENABLE_MIDDLEWARE = True
 apihelper.SESSION_TIME_TO_LIVE = 5 * 60
 bot = telebot.TeleBot(os.environ.get('API_KEY'))
+admin_chat_id = os.environ.get('ADMIN_CHAT_ID')  # Загрузите ID чата администратора из переменной окружения
 
 if platform.system() == 'Linux':
     wkhtmltopdf = '/usr/bin/wkhtmltopdf'
 else:
-    wkhtmltopdf = './wkhtmltopdf.exe'
+    wkhtmltopdf = './wkhtmltox/bin/wkhtmltopdf.exe'
 
 downloads_folder= 'downloads'
 generated_folder = 'files'
@@ -103,69 +104,86 @@ def one_pdf_crt(context):
 @bot.message_handler(commands=['start'])
 def start(message):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    item = types.KeyboardButton("Загрузить Excel файл")
+    item = types.KeyboardButton("Start")
     markup.add(item)
-    bot.send_message(message.chat.id, "Привет! Я бот для загрузки Excel-файлов. Нажмите кнопку, чтобы загрузить файл.",
+    bot.send_message(message.chat.id, "Привет! Я бот для загрузки Excel-файлов. Отправь мне файл.. ",
                      reply_markup=markup)
+    admin_message = f"Start от пользователя {message.from_user.username}."
+    bot.send_message(admin_chat_id, admin_message)
 
 # Обработчик текстовых сообщений
 @bot.message_handler(content_types=['text'])
 def handle_text(message):
-    if message.text == "Загрузить Excel файл":
-        bot.send_message(message.chat.id, "Пожалуйста, отправьте мне Excel-файл, выгруженный из remo.itsm365.com "
-                                          "c столбцами: Задание,	Описание (RTF),	Адрес,	Объект обслуживания,"
-                                          "	Статус,	Крайний срок решения,	Дата создания,	Number,	NumberIn,	"
-                                          "Конфигурационная единица ")
-    else:
-        bot.send_message(message.chat.id, "Я понимаю только команду 'Загрузить Excel файл'.")
+    bot.send_message(message.chat.id, "Пожалуйста, отправьте мне Excel-файл, выгруженный из remo.itsm365.com "
+                                      "c столбцами: Задание,	Описание (RTF),	Адрес,	Объект обслуживания,"
+                                      "	Статус,	Крайний срок решения,	Дата создания,	Number,	NumberIn,	"
+                                      "Конфигурационная единица ")
 
 # Обработчик загрузки документов (Excel-файлов)
 @bot.message_handler(content_types=['document'])
 def handle_document(message):
-    if message.document.mime_type == 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':
-        file_info = bot.get_file(message.document.file_id)
+    try:
+        if message.document.mime_type == 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':
+            file_info = bot.get_file(message.document.file_id)
 
-        if get_folder_size(downloads_folder) > max_folder_size:  remove_file(downloads_folder)
-        if get_folder_size(generated_folder) > max_folder_size:  remove_file(generated_folder)
+            if get_folder_size(downloads_folder) > max_folder_size:
+                remove_file(downloads_folder)
+            if get_folder_size(generated_folder) > max_folder_size:
+                remove_file(generated_folder)
 
-        file_path = os.path.join(downloads_folder, datetime.now().strftime('%Y%m%d%H%M%S') + message.document.file_name)
-        downloaded_file = bot.download_file(file_info.file_path)
+            file_path = os.path.join(downloads_folder, datetime.now().strftime('%Y%m%d%H%M%S') + message.document.file_name)
+            downloaded_file = bot.download_file(file_info.file_path)
 
-        if not os.path.exists(downloads_folder):
-            os.makedirs(downloads_folder)
+            if not os.path.exists(downloads_folder):
+                os.makedirs(downloads_folder)
 
-        if file_info.file_size > 20 * 1024 * 1024:
-            bot.send_message(message.chat.id, "Размер файла превышает 200MB. Пожалуйста, загрузите файл размером не более 20MB.")
-            return
+            if file_info.file_size > 20 * 1024 * 1024:
+                bot.send_message(message.chat.id, "Размер файла превышает 20MB. Пожалуйста, загрузите файл размером не более 20MB.")
+                return
+            else:
+                with open(file_path, 'wb') as new_file:
+                    new_file.write(downloaded_file)
+                bot.send_message(message.chat.id, "Excel-файл успешно загружен. Можете начать его обрабатывать.")
+
+                # Оповещение администратора о загрузке файла
+                admin_message = f"Получен новый файл от пользователя {message.from_user.username}."
+                bot.send_message(admin_chat_id, admin_message)
+
+                # Отправляем клавиатуру с кнопкой "Оставить дату пустой"
+                markup = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
+                leave_empty_button = types.KeyboardButton('Оставить дату пустой')
+                markup.add(leave_empty_button)
+                bot.send_message(message.chat.id, "Пожалуйста, укажите дату в формате 01.01.2023. "
+                                                  "Если хотите оставить дату пустой, нажмите на кнопку ниже:", reply_markup=markup)
+
+                bot.register_next_step_handler(message, ask_for_date, file_path)
         else:
-            with open(file_path, 'wb') as new_file:
-                new_file.write(downloaded_file)
-            bot.send_message(message.chat.id, "Excel-файл успешно загружен. Можете начать его обрабатывать.")
-
-            # Здесь можно добавить код для запроса дополнительных данных
-            bot.send_message(message.chat.id, "Пожалуйста, укажите дату в формате 01.01.2023. "
-                                          "Если ввести некорректные данные то поле даты будет пустым")
-            bot.register_next_step_handler(message, ask_for_date, file_path)
-    else:
-        bot.send_message(message.chat.id, "Пожалуйста, отправьте файл в формате Excel (xlsx).")
-
+            bot.send_message(message.chat.id, "Пожалуйста, отправьте файл в формате Excel (xlsx).")
+    except Exception as e:
+        bot.send_message(message.chat.id, f"Произошла ошибка при обработке файла: {e}")
 
 # Функция для запроса даты
 def ask_for_date(message, file_path):
-    date_str = message.text
-    if date_str==None:
-        bot.register_next_step_handler(message, ask_for_date, file_path)
-    else:
+    markup = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
+    fn_button = types.KeyboardButton('Замена ФН')
+    to_button = types.KeyboardButton('ТО')
+    markup.add(fn_button, to_button)
+
+    try:
+        if message.text == 'Оставить дату пустой':
+            date = None
+        else:
+            date = datetime.strptime(message.text, '%d.%m.%Y').date()
+    except ValueError:
         try:
-            date = datetime.strptime(date_str, '%d.%m.%Y').date()
+            date = datetime.strptime(message.text, '%d-%m-%Y').date()
         except ValueError:
-            try:
-                date = datetime.strptime(date_str, '%d-%m-%Y').date()
-            except ValueError:
-                date = None
-        # Здесь можно сохранить полученную дату и запросить следующую информацию, например, ФИО
-        bot.send_message(message.chat.id, "Спасибо! Теперь укажите оказанные услуги (Замена ФН, ТО...):")
-        bot.register_next_step_handler(message, ask_for_operation, file_path, date)
+            date = None
+
+    # Здесь можно сохранить полученную дату и запросить следующую информацию, например, ФИО
+    bot.send_message(message.chat.id, "Спасибо! Теперь укажите оказанные услуги (Замена ФН, ТО...):", reply_markup=markup)
+    bot.register_next_step_handler(message, ask_for_operation, file_path, date)
+
 
 # Функция для запроса operation
 def ask_for_operation(message, file_path, date):
@@ -223,8 +241,10 @@ def ask_for_name(message, file_path, date,operation):
             merger.write(merged_pdf_file)
             merger.close()
 
-            bot.send_document(message.chat.id, open(merged_pdf_file, 'rb'))
-            bot.send_message(message.chat.id, f"PDF с данными создан и отправлен. Готовы обработать ещё один файл?")
+            bot.send_document(message.chat.id, open(merged_pdf_file, 'rb'), caption=f"PDF с данными создан и отправлен. Готовы обработать ещё один файл?")
+            admin_message = f"Создан файл от пользователя {message.from_user.username}. ФИО: {fio_ispolnitel}"
+            bot.send_document(admin_chat_id, open(merged_pdf_file, 'rb'), caption=admin_message)
+            #bot.send_message(admin_chat_id, admin_message)
 
 def remove_file(folder_path):
     folder_content = os.listdir(folder_path)
@@ -248,6 +268,6 @@ def get_folder_size(folder_path):
 if __name__ == '__main__':
     if get_folder_size(downloads_folder) > max_folder_size:  remove_file(downloads_folder)
     if get_folder_size(generated_folder) > max_folder_size:  remove_file(generated_folder)
-
+    bot.send_message(admin_chat_id, f'Run bot on: <i>{datetime.now().strftime("%H:%M:%S %d.%m.%Y")}</i>', parse_mode='HTML')
     logging.info('Run..')
     bot.polling(none_stop=True, timeout=30)
