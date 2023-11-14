@@ -12,7 +12,6 @@ import logging
 import platform
 from dotenv import load_dotenv
 
-
 logging.basicConfig(level=logging.INFO, filename="py_log.log", filemode="w")
 
 # Инициализация бота
@@ -30,9 +29,10 @@ if platform.system() == 'Linux':
 else:
     wkhtmltopdf = './wkhtmltox/bin/wkhtmltopdf.exe'
 
-downloads_folder= 'downloads'
+downloads_folder = 'downloads'
 generated_folder = 'files'
 max_folder_size = 1000 * 1024 * 1024  # 1000 МБ в байтах
+
 
 def generate_documents(exelfile, operation, fio_ispolnitel, day, month, year):
     # Загрузка данных из файла Excel
@@ -61,7 +61,7 @@ def generate_documents(exelfile, operation, fio_ispolnitel, day, month, year):
             name_file = f"{index_ops}_{str(row['NumberIn'])}_{str(row['Number'])}_{str(row['Задание']).replace('/', '-')}"
 
             # Создание контекста для заполнения шаблона
-            context = {'name_file':name_file,
+            context = {'name_file': name_file,
                        'fio_ispolnitel': fio_ispolnitel,
                        'day': day,
                        'month': month,
@@ -77,7 +77,7 @@ def generate_documents(exelfile, operation, fio_ispolnitel, day, month, year):
                        'num_im': str(row['Number'])}
 
             file_path = one_pdf_crt(context)
-            #logging.info(f'one_pdf_crt(context)  = {file_path}')
+            # logging.info(f'one_pdf_crt(context)  = {file_path}')
             generated_docs.append(file_path)
         except Exception as e:
             logging.error(f"Error processing row: {e}")
@@ -85,6 +85,7 @@ def generate_documents(exelfile, operation, fio_ispolnitel, day, month, year):
 
     logging.info(f'return generated_docs = {generated_docs}')
     return generated_docs
+
 
 def one_pdf_crt(context):
     template_loader = jinja2.FileSystemLoader('./')
@@ -100,16 +101,17 @@ def one_pdf_crt(context):
 
     return pdf_path
 
+
 # Обработчик команды /start
 @bot.message_handler(commands=['start'])
 def start(message):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     item = types.KeyboardButton("Start")
     markup.add(item)
-    bot.send_message(message.chat.id, "Привет! Я бот для загрузки Excel-файлов. Отправь мне файл.. ",
-                     reply_markup=markup)
+    bot.send_message(message.chat.id, "Привет! Я бот для загрузки Excel-файлов. Отправь мне файл.. ")
     admin_message = f"Start от пользователя {message.from_user.username}."
     bot.send_message(admin_chat_id, admin_message)
+
 
 # Обработчик текстовых сообщений
 @bot.message_handler(content_types=['text'])
@@ -117,7 +119,8 @@ def handle_text(message):
     bot.send_message(message.chat.id, "Пожалуйста, отправьте мне Excel-файл, выгруженный из remo.itsm365.com "
                                       "c столбцами: Задание,	Описание (RTF),	Адрес,	Объект обслуживания,"
                                       "	Статус,	Крайний срок решения,	Дата создания,	Number,	NumberIn,	"
-                                      "Конфигурационная единица ")
+                                      "Конфигурационная единица ", reply_markup=types.ReplyKeyboardRemove())
+
 
 # Обработчик загрузки документов (Excel-файлов)
 @bot.message_handler(content_types=['document'])
@@ -131,14 +134,16 @@ def handle_document(message):
             if get_folder_size(generated_folder) > max_folder_size:
                 remove_file(generated_folder)
 
-            file_path = os.path.join(downloads_folder, datetime.now().strftime('%Y%m%d%H%M%S') + message.document.file_name)
+            file_path = os.path.join(downloads_folder,
+                                     datetime.now().strftime('%Y%m%d%H%M%S') + message.document.file_name)
             downloaded_file = bot.download_file(file_info.file_path)
 
             if not os.path.exists(downloads_folder):
                 os.makedirs(downloads_folder)
 
             if file_info.file_size > 20 * 1024 * 1024:
-                bot.send_message(message.chat.id, "Размер файла превышает 20MB. Пожалуйста, загрузите файл размером не более 20MB.")
+                bot.send_message(message.chat.id,
+                                 "Размер файла превышает 20MB. Пожалуйста, загрузите файл размером не более 20MB.")
                 return
             else:
                 with open(file_path, 'wb') as new_file:
@@ -155,13 +160,15 @@ def handle_document(message):
                 today_button = types.KeyboardButton(f'{datetime.now().strftime("%d.%m.%Y")}')
                 markup.add(leave_empty_button, today_button)
                 bot.send_message(message.chat.id, "Пожалуйста, укажите дату в формате 01.01.2023. "
-                                                  "Если хотите оставить дату пустой, нажмите на кнопку ниже:", reply_markup=markup)
+                                                  "Если хотите оставить дату пустой, нажмите на кнопку ниже:",
+                                 reply_markup=markup)
 
                 bot.register_next_step_handler(message, ask_for_date, file_path)
         else:
             bot.send_message(message.chat.id, "Пожалуйста, отправьте файл в формате Excel (xlsx).")
     except Exception as e:
         bot.send_message(message.chat.id, f"Произошла ошибка при обработке файла: {e}")
+
 
 # Функция для запроса даты
 def ask_for_date(message, file_path):
@@ -182,24 +189,26 @@ def ask_for_date(message, file_path):
             date = None
 
     # Здесь можно сохранить полученную дату и запросить следующую информацию, например, ФИО
-    bot.send_message(message.chat.id, "Спасибо! Теперь укажите оказанные услуги (Замена ФН, ТО...):", reply_markup=markup)
+    bot.send_message(message.chat.id, "Спасибо! Теперь укажите оказанные услуги (Замена ФН, ТО...):",
+                     reply_markup=markup)
     bot.register_next_step_handler(message, ask_for_operation, file_path, date)
 
 
 # Функция для запроса operation
 def ask_for_operation(message, file_path, date):
     operation = message.text
-    if operation==None:
+    if operation == None:
         bot.register_next_step_handler(message, ask_for_operation, file_path, date)
     else:
         # Здесь можно сохранить полученную дату и запросить следующую информацию, например, ФИО
         bot.send_message(message.chat.id, "Спасибо! Теперь укажите ФИО исполнителя:")
         bot.register_next_step_handler(message, ask_for_name, file_path, date, operation)
 
+
 # Функция для запроса ФИО
-def ask_for_name(message, file_path, date,operation):
+def ask_for_name(message, file_path, date, operation):
     fio_ispolnitel = message.text
-    if fio_ispolnitel==None:
+    if fio_ispolnitel == None:
         bot.register_next_step_handler(message, ask_for_name, file_path, date, operation)
     else:
         if date:
@@ -242,10 +251,12 @@ def ask_for_name(message, file_path, date,operation):
             merger.write(merged_pdf_file)
             merger.close()
 
-            bot.send_document(message.chat.id, open(merged_pdf_file, 'rb'), caption=f"PDF с данными создан и отправлен. Готовы обработать ещё один файл?")
+            bot.send_document(message.chat.id, open(merged_pdf_file, 'rb'), caption=f"PDF с данными создан и "
+                                                                                    f"отправлен. Готовы обработать "
+                                                                                    f"ещё один файл?")
             admin_message = f"Создан файл от пользователя {message.from_user.username}. ФИО: {fio_ispolnitel}"
             bot.send_document(admin_chat_id, open(merged_pdf_file, 'rb'), caption=admin_message)
-            #bot.send_message(admin_chat_id, admin_message)
+
 
 def remove_file(folder_path):
     folder_content = os.listdir(folder_path)
@@ -257,6 +268,7 @@ def remove_file(folder_path):
     for file, _ in oldest_files:
         os.remove(os.path.join(folder_path, file))
 
+
 def get_folder_size(folder_path):
     total_size = 0
     for path, dirs, files in os.walk(folder_path):
@@ -265,10 +277,12 @@ def get_folder_size(folder_path):
             total_size += os.path.getsize(file_path)
     return total_size
 
+
 # Запуск бота
 if __name__ == '__main__':
     if get_folder_size(downloads_folder) > max_folder_size:  remove_file(downloads_folder)
     if get_folder_size(generated_folder) > max_folder_size:  remove_file(generated_folder)
-    bot.send_message(admin_chat_id, f'Run bot on: <i>{datetime.now().strftime("%H:%M:%S %d.%m.%Y")}</i>', parse_mode='HTML')
+    bot.send_message(admin_chat_id, f'Run bot on: <i>{datetime.now().strftime("%H:%M:%S %d.%m.%Y")}</i>',
+                     parse_mode='HTML')
     logging.info('Run..')
     bot.polling(none_stop=True, timeout=30)
