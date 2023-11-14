@@ -152,7 +152,8 @@ def handle_document(message):
                 # Отправляем клавиатуру с кнопкой "Оставить дату пустой"
                 markup = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
                 leave_empty_button = types.KeyboardButton('Оставить дату пустой')
-                markup.add(leave_empty_button)
+                today_button = types.KeyboardButton(f'{datetime.now().strftime("%d.%m.%Y")}')
+                markup.add(leave_empty_button, today_button)
                 bot.send_message(message.chat.id, "Пожалуйста, укажите дату в формате 01.01.2023. "
                                                   "Если хотите оставить дату пустой, нажмите на кнопку ниже:", reply_markup=markup)
 
