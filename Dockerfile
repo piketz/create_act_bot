@@ -2,6 +2,8 @@ FROM python:3.9-slim-bullseye
 
 ENV PATH /usr/local/bin:$PATH
 ARG API_KEY
+ARG ADMIN_CHAT_ID
+ENV ADMIN_CHAT_ID=$ADMIN_CHAT_ID
 ENV API_KEY=$API_KEY
 COPY template.html /app/template.html
 COPY main.py /app/main.py
