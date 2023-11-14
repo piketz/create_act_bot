@@ -191,7 +191,7 @@ def ask_for_name(message, file_path, date,operation):
             day, month, year = None, None, None
 
         # Здесь можно сохранить полученное ФИО и продолжить обработку файла
-        bot.send_message(message.chat.id, f"Спасибо! Вы указали ФИО: {fio_ispolnitel}. Оказанные услуги: {operation}"
+        bot.send_message(message.chat.id, f"Спасибо! Вы указали ФИО: {fio_ispolnitel}. Оказанные услуги: {operation} "
                                           f"Дата подписания акта: {date} "
                                           f"Подождите, я создам PDF с данными...")
 

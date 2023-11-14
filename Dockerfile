@@ -5,7 +5,6 @@ ENV API_KEY=$API_KEY
 COPY template.html /app/template.html
 COPY tele_bot.py /app/tele_bot.py
 COPY requirements.txt /app/requirements.txt
-COPY .env /app/.env
 
 
 WORKDIR /app
