@@ -26,7 +26,7 @@ bot = telebot.TeleBot(os.environ.get('API_KEY'))
 admin_chat_id = os.environ.get('ADMIN_CHAT_ID')  # Загрузите ID чата администратора из переменной окружения
 
 if platform.system() == 'Linux':
-    wkhtmltopdf = '/usr/bin/wkhtmltopdf'
+    wkhtmltopdf = '/bin/wkhtmltopdf'
 else:
     wkhtmltopdf = './wkhtmltox/bin/wkhtmltopdf.exe'
 
