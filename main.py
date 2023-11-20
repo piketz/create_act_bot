@@ -81,6 +81,7 @@ def generate_documents(exelfile, operation, fio_ispolnitel, day, month, year):
 
             # Создание контекста для заполнения шаблона
             context = {'name_file': name_file,
+                       'nn': str(row['Задание']),
                        'fio_ispolnitel': fio_ispolnitel,
                        'day': day,
                        'month': month,
@@ -114,9 +115,9 @@ def one_pdf_crt(context):
 
     temp_dir = tempfile.mkdtemp()
     pdf_path = os.path.join(temp_dir, f"{context['name_file']}.pdf")
-
+    options = {  "enable-local-file-access": None}
     config = pdfkit.configuration(wkhtmltopdf=wkhtmltopdf)
-    pdfkit.from_string(output_text, pdf_path, configuration=config)
+    pdfkit.from_string(output_text, pdf_path, configuration=config, options=options)
 
     return pdf_path
 
@@ -266,7 +267,7 @@ def ask_for_name(message, file_path, date, operation):
     generated_docs = generate_documents(file_path, operation, fio_ispolnitel, day, month, year)
     if generated_docs == None:
         logging.error(f'error format generated_docs = {generated_docs}')
-        bot.send_message(message.chat.id, "Excel-файл имеет неверное содержание. "
+        bot.send_message(message.chat.id, "Произошла ошибка или Excel-файл имеет неверное содержание. "
                                           "Он должен содержать столбцы Задание,	"
                                           "Описание (RTF),	Адрес,	Объект обслуживания, "
                                           "Статус, Крайний срок решения, "
