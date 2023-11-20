@@ -257,12 +257,12 @@ def ask_for_name(message, file_path, date, operation):
         fio_ispolnitel = "_____________"
         bot.send_message(message.chat.id, f"Спасибо! Вы не указали исполнителя. Оказанные услуги: {operation} "
                                           f"Дата подписания акта: {date} "
-                                          f"Подождите, я создам PDF с данными...")
+                                          f"Подождите, я создам PDF с данными...", reply_markup=types.ReplyKeyboardRemove())
     else:
         fio_ispolnitel = message.text
         bot.send_message(message.chat.id, f"Спасибо! Вы указали ФИО: {fio_ispolnitel}. Оказанные услуги: {operation} "
                                           f"Дата подписания акта: {date} "
-                                          f"Подождите, я создам PDF с данными...")
+                                          f"Подождите, я создам PDF с данными...", reply_markup=types.ReplyKeyboardRemove())
 
     generated_docs = generate_documents(file_path, operation, fio_ispolnitel, day, month, year)
     if generated_docs == None:
@@ -273,7 +273,7 @@ def ask_for_name(message, file_path, date, operation):
                                           "Статус, Крайний срок решения, "
                                           "Дата создания, Number,	NumberIn, "
                                           "Конфигурационная единица. "
-                                          "Выберете данные поля при поиске в remo.itsm365.com")
+                                          "Выберете данные поля при поиске в remo.itsm365.com", reply_markup=types.ReplyKeyboardRemove())
     else:
         if not os.path.exists(generated_folder):
             os.makedirs(generated_folder)
@@ -292,7 +292,7 @@ def ask_for_name(message, file_path, date, operation):
 
         bot.send_document(message.chat.id, open(merged_pdf_file, 'rb'), caption=f"PDF с данными создан и "
                                                                                 f"отправлен. Готовы обработать "
-                                                                                f"ещё один файл?")
+                                                                                f"ещё один файл?", reply_markup=types.ReplyKeyboardRemove())
         admin_message = f"Создан файл от пользователя {message.from_user.username}. ФИО: {fio_ispolnitel}"
         bot.send_document(admin_chat_id, open(merged_pdf_file, 'rb'), caption=admin_message)
 
