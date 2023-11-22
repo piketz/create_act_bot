@@ -324,4 +324,4 @@ if __name__ == '__main__':
     bot.send_message(admin_chat_id, f'Run bot on: <i>{datetime.now().strftime("%H:%M:%S %d.%m.%Y")}</i>',
                      parse_mode='HTML')
     logging.info('Run..')
-    bot.polling(none_stop=True, timeout=30)
+    bot.polling(none_stop=True, timeout=60)
