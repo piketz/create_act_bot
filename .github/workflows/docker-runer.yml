@@ -3,17 +3,15 @@ name: Deploy Docker Compose
 on:
   push:
     branches:
-      - main  # Запускать workflow при пушах в ветку main
+      - main  
 
 jobs:
   deploy:
-    runs-on: self-hosted  # Используем ваш собственный GitHub Runner
+    runs-on: self-hosted  
     steps:
-      # Проверка кода из репозитория
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # Построение образов и запуск контейнеров
       - name: Deploy with Docker Compose
         env:
           API_KEY: ${{ secrets.API_KEY }}
