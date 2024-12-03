@@ -15,6 +15,12 @@ jobs:
 
       # Построение образов и запуск контейнеров
       - name: Deploy with Docker Compose
+        env:
+          API_KEY: ${{ secrets.API_KEY }}
+          ADMIN_CHAT_ID: ${{ secrets.ADMIN_CHAT_ID }}
         run: |
-          docker-compose down  # Остановить предыдущие контейнеры, если они есть
-          docker-compose up -d --build  # Собрать и запустить контейнеры
+          echo "API_KEY=$API_KEY" >> .env
+          echo "ADMIN_CHAT_ID=$ADMIN_CHAT_ID" >> .env
+          echo "API_KEY_DEV" >> .env
+          docker-compose down
+          docker-compose up -d --build
