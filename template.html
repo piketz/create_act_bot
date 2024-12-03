@@ -3,12 +3,35 @@
     <meta charset="UTF-8">
     <link href='img/main.css' rel='stylesheet' type='text/css' />
 </head>
-<body><p style="font-size: 10px;">{{nn}}</p>
+<body>
+<br>
 <p style="text-align: center;"><img src="/app/img/logo.png" style="width: 25%;"><br /></p>
+<!-- <p style="font-size: 10px;">{{nn}}</p>-->
 <p style="text-align: center;"><strong>Общество с ограниченной ответственностью &laquo;Сервионика&raquo;<br />(ООО &laquo;Сервионика&raquo;)</strong></p>
 <p style="text-align: center;"><strong>Технический акт оказанных услуг &laquo;{{day}}&raquo; &nbsp;{{month}}&nbsp;&nbsp; {{year}} г.</strong><br />
     по Договору &laquo;16&raquo; февраля 2023г. № 108672-1/23ПС</p>
-<p style="text-align: center;"><em>по заявке № {{num_rp}} {{num_im}} от &laquo;{{day_crt}}&raquo; {{month_crt}} {{year_crt}} г.</em></p>
+<!-- <p style="text-align: center;"><em>по заявке № {{num_rp}} {{num_im}} от &laquo;{{day_crt}}&raquo; {{month_crt}} {{year_crt}} г.</em></p>-->
+<p style="text-align: center;"><em>по заявке № {{num_rp_1}} {{num_im_1}}
+{% if num_rp_2 %}
+    , № {{num_rp_2}} {{num_im_2}}
+{% endif %}
+{% if num_rp_3 %}
+    , № {{num_rp_3}} {{num_im_3}}
+{% endif %}
+{% if num_rp_4 %}
+    , № {{num_rp_4}} {{num_im_4}}
+{% endif %}
+{% if num_rp_5 %}
+    , № {{num_rp_5}} {{num_im_5}}
+{% endif %}
+{% if num_rp_6 %}
+    , № {{num_rp_6}} {{num_im_6}}
+{% endif %}
+{% if num_rp_7 %}
+    , № {{num_rp_7}} {{num_im_7}}
+{% endif %}
+от &laquo;{{day_crt}}&raquo; {{month_crt}} {{year_crt}} г.</em></p>
+
 <p><br />Заказчик: ООО &laquo;Почта Сервис&raquo; УФПС РЕСПУБЛИКИ БАШКОРТОСТАН</p>
 <p><br />Площадка Обслуживания: {{index_adress}}</p>
 <p style="text-align: center;">&nbsp;Оказанные услуги:</p>
@@ -25,25 +48,81 @@
 
 <tr style="height: 20px;">
     <td><p>1</p></td>
-    <td><p>{{model_ke}}</p></td>
-    <td>{{num_ke}}</td>
+    <td><p>{{model_ke_1}}</p></td>
+    <td>{{num_ke_1}}</td>
     <td><p></p></td>
     <td><p>{{work}}</p></td>
 </tr>
-
 <tr style="height: 20px;">
     <td><p>2</p></td>
-    <td></td>
-    <td></td>
-    <td></td>
-    <td></td>
+    <td><p>{{model_ke_2}}</p></td>
+    <td>{{num_ke_2}}</td>
+    <td><p></p></td>
+    {% if model_ke_2 and num_ke_2 %}
+    <td><p>{{work}}</p></td>
+    {% else %}
+    <td><p></p></td>
+    {% endif %}
 </tr>
+
 <tr style="height: 20px;">
     <td><p>3</p></td>
-    <td></td>
-    <td></td>
-    <td></td>
-    <td></td>
+    <td><p>{{model_ke_3}}</p></td>
+    <td>{{num_ke_3}}</td>
+    <td><p></p></td>
+    {% if model_ke_3 and num_ke_3 %}
+    <td><p>{{work}}</p></td>
+    {% else %}
+    <td><p></p></td>
+    {% endif %}
+</tr>
+
+<tr style="height: 20px;">
+    <td><p>4</p></td>
+    <td><p>{{model_ke_4}}</p></td>
+    <td>{{num_ke_4}}</td>
+    <td><p></p></td>
+    {% if model_ke_4 and num_ke_4 %}
+    <td><p>{{work}}</p></td>
+    {% else %}
+    <td><p></p></td>
+    {% endif %}
+</tr>
+
+<tr style="height: 20px;">
+    <td><p>5</p></td>
+    <td><p>{{model_ke_5}}</p></td>
+    <td>{{num_ke_5}}</td>
+    <td><p></p></td>
+    {% if model_ke_5 and num_ke_5 %}
+    <td><p>{{work}}</p></td>
+    {% else %}
+    <td><p></p></td>
+    {% endif %}
+</tr>
+
+<tr style="height: 20px;">
+    <td><p>6</p></td>
+    <td><p>{{model_ke_6}}</p></td>
+    <td>{{num_ke_6}}</td>
+    <td><p></p></td>
+    {% if model_ke_6 and num_ke_6 %}
+    <td><p>{{work}}</p></td>
+    {% else %}
+    <td><p></p></td>
+    {% endif %}
+</tr>
+
+<tr style="height: 20px;">
+    <td><p>7</p></td>
+    <td><p>{{model_ke_7}}</p></td>
+    <td>{{num_ke_7}}</td>
+    <td><p></p></td>
+    {% if model_ke_7 and num_ke_7 %}
+    <td><p>{{work}}</p></td>
+    {% else %}
+    <td><p></p></td>
+    {% endif %}
 </tr>
 
 </tbody>
@@ -63,10 +142,6 @@
 </tr>
 <tr style="height: 20px;">
     <td><p>2</p></td>
-    <td></td>
-</tr>
-<tr style="height: 20px;">
-    <td><p>3</p></td>
     <td></td>
 </tr>
 </tbody>
