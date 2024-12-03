@@ -11,6 +11,9 @@ import pandas as pd
 import logging
 import platform
 from dotenv import load_dotenv
+import json
+import requests
+import base64
 
 logging.basicConfig(level=logging.INFO, filename="py_log.log", filemode="w")
 
@@ -21,13 +24,14 @@ if os.path.exists(dotenv_path):
 
 apihelper.ENABLE_MIDDLEWARE = True
 apihelper.SESSION_TIME_TO_LIVE = 5 * 60
-bot = telebot.TeleBot(os.environ.get('API_KEY'))
 admin_chat_id = os.environ.get('ADMIN_CHAT_ID')  # Загрузите ID чата администратора из переменной окружения
 
 if platform.system() == 'Linux':
     wkhtmltopdf = '/bin/wkhtmltopdf'
+    bot = telebot.TeleBot(os.environ.get('API_KEY'))
 else:
     wkhtmltopdf = './wkhtmltox/bin/wkhtmltopdf.exe'
+    bot = telebot.TeleBot(os.environ.get('API_KEY_dev'))
 
 downloads_folder = 'downloads'
 generated_folder = 'files'
@@ -54,72 +58,160 @@ def check_file_content(exelfile):
 
 
 def generate_documents(exelfile, operation, fio_ispolnitel, day, month, year):
+    """
+    Генерирует PDF-документы на основе данных из файла Excel с учетом ограничения в 7 строк данных для каждого index_ops.
+
+    Args:
+        exelfile (str): Путь к файлу Excel с данными.
+        operation (str): Операция или услуга, представленная в данных.
+        fio_ispolnitel (str): ФИО исполнителя операции или услуги.
+        day (str): День для заполнения PDF-файлов (в формате 'dd').
+        month (str): Месяц для заполнения PDF-файлов (в формате 'mm').
+        year (str): Год для заполнения PDF-файлов (в формате 'yyyy').
+
+    Returns:
+        list or None: Список путей к созданным PDF-файлам или None в случае ошибки.
+    """
     # Загрузка данных из файла Excel
-    global generated_docs
     df = pd.read_excel(exelfile)
 
-    if not day: day = '__'
-    if not month: month = '__'
-    if not year: year = '____'
+    # Проверка на пустые значения дня, месяца и года
+    if not day:
+        day = '__'
+    if not month:
+        month = '__'
+    if not year:
+        year = '____'
 
+    # Логирование информации о вызове функции
     logging.info(f'generate_documents '
                  f'exelfile={exelfile}, '
                  f'operation={operation}, '
                  f'fio_ispolnitel={fio_ispolnitel}, '
                  f'day={day}')
 
+    # Инициализация списка для хранения путей к созданным PDF-файлам
     generated_docs = []
+
+    # Словарь для хранения строк данных для каждого index_ops
+    data_groups = {}
+
+    # Обработка каждой строки данных из файла Excel
     for index, row in df.iterrows():
         try:
+            # Получение данных из текущей строки
+            index_ops = str(row['Объект обслуживания']).split()[0]
+            config_data = str(row['Конфигурационная единица'])
+            config_parts = [part.strip() for part in config_data.split('|')]
+            name_file = f"{index_ops}_{str(row['NumberIn'])}_{str(row['Number'])}_{str(row['Задание']).replace('/', '-')}"
             date_str = str(row['Дата создания'])
             date_obj = parser.parse(date_str)
 
-            config_data = str(row['Конфигурационная единица'])
-            config_parts = [part.strip() for part in config_data.split('|')]
-            index_ops = str(row['Объект обслуживания']).split()[0]
-            name_file = f"{index_ops}_{str(row['NumberIn'])}_{str(row['Number'])}_{str(row['Задание']).replace('/', '-')}"
+            # Добавление строки данных в соответствующую группу по index_ops
+            if index_ops not in data_groups:
+                data_groups[index_ops] = []
 
-            # Создание контекста для заполнения шаблона
-            context = {'name_file': name_file,
-                       'nn': str(row['Задание']),
-                       'fio_ispolnitel': fio_ispolnitel,
-                       'day': day,
-                       'month': month,
-                       'year': year,
-                       'day_crt': date_obj.day,
-                       'month_crt': date_obj.month,
-                       'year_crt': date_obj.year,
-                       'index_adress': str(row['Объект обслуживания']),
-                       'model_ke': f'{config_parts[1]} {config_parts[2]} {config_parts[3]}',
-                       'num_ke': config_parts[0],
-                       'work': operation,
-                       'num_rp': str(row['NumberIn']),
-                       'num_im': str(row['Number'])}
-
-            file_path = one_pdf_crt(context)
-            # logging.info(f'one_pdf_crt(context)  = {file_path}')
-            generated_docs.append(file_path)
+            data_groups[index_ops].append({
+                'name_file': name_file,
+                'nn': str(row['Задание']),
+                'fio_ispolnitel': fio_ispolnitel,
+                'day': day,
+                'month': month,
+                'year': year,
+                'day_crt': date_obj.day,
+                'month_crt': date_obj.month,
+                'year_crt': date_obj.year,
+                'index_adress': str(row['Объект обслуживания']),
+                'model_ke': f'{config_parts[1]} {config_parts[2]} {config_parts[3]}',
+                'num_ke': config_parts[0],
+                'work': operation,
+                'num_rp': str(row['NumberIn']),
+                'num_im': str(row['Number'])
+            })
         except Exception as e:
             logging.error(f"Error processing row: {e}")
-            return None
+            print(f"Error processing row: {e}")
+            return None  # В случае ошибки возвращается None
 
+    # Обработка данных для каждого index_ops
+    for index_ops, data_group in data_groups.items():
+        #print(f'data_group = {data_group}')
+        try:
+            # Инициализация списка для хранения путей к созданным PDF-файлам для текущего index_ops
+            generated_docs_index_ops = []
+
+            # Разбиение данных на группы по 7 строк для каждого index_ops
+            for i in range(0, len(data_group), 7):
+                data_chunk = data_group[i:i+7]
+
+                # Создание контекста для текущей группы данных
+                context = {}
+                for j, data_row in enumerate(data_chunk, start=1):
+                    for key, value in data_row.items():
+                        if key == 'model_ke':
+                            context[f'model_ke_{j}'] = value
+                            context[f'num_ke_{j}'] = data_row['num_ke']  # Присваиваем значение num_ke каждой model_ke
+                            context[f'num_rp_{j}'] = data_row['num_rp']
+                            context[f'num_im_{j}'] = data_row['num_im']
+                        else:
+                            context[key] = value
+
+                # Создание PDF-файла на основе текущей группы данных
+                file_path = one_pdf_crt(context)
+           #     print(f'context = {context}')
+                if file_path:
+                    generated_docs_index_ops.append(file_path)
+
+            # Добавление путей к созданным PDF-файлам в общий список
+            generated_docs.extend(generated_docs_index_ops)
+        except Exception as e:
+            print(f"Error processing data group for index_ops={index_ops}: {e}")
+            logging.error(f"Error processing data group for index_ops={index_ops}: {e}")
+            return None  # В случае ошибки возвращается None
+
+    # Логирование информации о созданных PDF-файлах
     logging.info(f'return generated_docs = {generated_docs}')
+
+    # Возвращение списка путей к созданным PDF-файлам
     return generated_docs
 
 
 def one_pdf_crt(context):
+    #url = 'http://gooduser:secretpassword@wkhtmltopdf:5555/'
+    #url = 'http://gooduser:secretpassword@localhost:5552/'
+    url = 'http://gooduser:secretpassword@192.168.1.229:5552/'
     template_loader = jinja2.FileSystemLoader('./')
     template_env = jinja2.Environment(loader=template_loader)
     template = template_env.get_template('template.html')
+    context = {k: v for k, v in context.items() if v is not None}
     output_text = template.render(context)
+    encoded_content = base64.b64encode(output_text.encode('utf-8')).decode('utf-8')
 
-    temp_dir = tempfile.mkdtemp()
-    pdf_path = os.path.join(temp_dir, f"{context['name_file']}.pdf")
-    options = {  "enable-local-file-access": None}
-    config = pdfkit.configuration(wkhtmltopdf=wkhtmltopdf)
-    pdfkit.from_string(output_text, pdf_path, configuration=config, options=options)
+    data = {
+        'contents': encoded_content,
+        'options': {
+            'enable-local-file-access': '',
+            'margin-top': '6',
+            'margin-right': '6',
+            'margin-bottom': '6',
+            'margin-left': '6',
+            'page-size': 'A3',
+           # 'page-width': '300mm',
+          #  'page-height': '450mm',
 
-    return pdf_path
+        }
+    }
+
+    response = requests.post(url, data=json.dumps(data), headers={'Content-Type': 'application/json'})
+
+    if response.status_code == 200:
+        pdf_path = os.path.join(tempfile.mkdtemp(), f"{context['name_file']}.pdf")
+        with open(pdf_path, 'wb') as f:
+            f.write(response.content)
+        return pdf_path
+    else:
+        logging.error(f'Error: {response.status_code}')
+        return None
 
 
 # Обработчик команды /start
@@ -161,6 +253,7 @@ def handle_document(message):
             if not os.path.exists(downloads_folder):
                 os.makedirs(downloads_folder)
 
+
             if file_in.file_size > 20 * 1024 * 1024:
                 bot.send_message(message.chat.id,
                                  "Размер файла превышает 20MB. Пожалуйста, загрузите файл размером не более 20MB.")
@@ -183,6 +276,12 @@ def handle_document(message):
                     return
                 else:
                     bot.send_message(message.chat.id, "Excel-файл успешно загружен. Можете начать его обрабатывать.")
+
+                if 'exportSD(1)' in message.document.file_name:
+                    bot.send_message(message.chat.id, "Имя файла 'exportSD(1)', запуск теста..")
+                    dev_test_create(message, file_path)
+                    return
+
 
                 # Оповещение администратора о загрузке файла
                 admin_message = f"Получен новый файл от пользователя {message.from_user.username}. filename: " \
@@ -267,16 +366,11 @@ def ask_for_name(message, file_path, date, operation):
     generated_docs = generate_documents(file_path, operation, fio_ispolnitel, day, month, year)
     if generated_docs == None:
         logging.error(f'error format generated_docs = {generated_docs}')
-        bot.send_message(message.chat.id, "Произошла ошибка или Excel-файл имеет неверное содержание. "
-                                          "Он должен содержать столбцы Задание,	"
-                                          "Описание (RTF),	Адрес,	Объект обслуживания, "
-                                          "Статус, Крайний срок решения, "
-                                          "Дата создания, Number,	NumberIn, "
-                                          "Конфигурационная единица. "
-                                          "Выберете данные поля при поиске в remo.itsm365.com", reply_markup=types.ReplyKeyboardRemove())
+        bot.send_message(message.chat.id, "Произошла ошибка при обработке файла 1", reply_markup=types.ReplyKeyboardRemove())
     else:
         if not os.path.exists(generated_folder):
             os.makedirs(generated_folder)
+
         merged_pdf_file = os.path.join(generated_folder,
                                        f"Generated_file_{datetime.now().strftime('%Y%m%d%H%M%S')}.pdf")
         logging.info('Объединяем все PDF файлы')
@@ -295,6 +389,32 @@ def ask_for_name(message, file_path, date, operation):
                                                                                 f"ещё один файл?", reply_markup=types.ReplyKeyboardRemove())
         admin_message = f"Создан файл от пользователя {message.from_user.username}. ФИО: {fio_ispolnitel}"
         bot.send_document(admin_chat_id, open(merged_pdf_file, 'rb'), caption=admin_message)
+
+def dev_test_create(message, file_path):
+    generated_docs = generate_documents(file_path, 'Test', 'Иванов А.А', '01', '01', '1991')
+    if generated_docs == None:
+        logging.error(f'error format generated_docs = {generated_docs}')
+        bot.send_message(message.chat.id, "Произошла ошибка при обработке файла 2", reply_markup=types.ReplyKeyboardRemove())
+    else:
+        if not os.path.exists(generated_folder):
+            os.makedirs(generated_folder)
+
+        merged_pdf_file = os.path.join(generated_folder,
+                                       f"Generated_file_{datetime.now().strftime('%Y%m%d%H%M%S')}.pdf")
+        logging.info('Объединяем все PDF файлы')
+        # Объединяем все PDF файлы
+        merger = PdfMerger()
+        for pdf_path in generated_docs:
+            merger.append(pdf_path)
+
+        logging.info('Сохраняем объединенный PDF файл')
+        # Сохраняем объединенный PDF файл
+        merger.write(merged_pdf_file)
+        merger.close()
+
+        bot.send_document(message.chat.id, open(merged_pdf_file, 'rb'), caption=f"PDF с данными создан и "
+                                                                                f"отправлен. Готовы обработать "
+                                                                                f"ещё один файл?", reply_markup=types.ReplyKeyboardRemove())
 
 
 def remove_file(folder_path):
