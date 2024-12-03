@@ -1,0 +1,26 @@
+name: Deploy Docker Compose
+
+on:
+  push:
+    branches:
+      - main  # Запускать workflow при пушах в ветку main
+
+jobs:
+  deploy:
+    runs-on: self-hosted  # Используем ваш собственный GitHub Runner
+    steps:
+      # Проверка кода из репозитория
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # Установка Docker Compose (если не установлен на раннере)
+      - name: Install Docker Compose
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y docker-compose
+
+      # Построение образов и запуск контейнеров
+      - name: Deploy with Docker Compose
+        run: |
+          docker-compose down  # Остановить предыдущие контейнеры, если они есть
+          docker-compose up -d --build  # Собрать и запустить контейнеры
