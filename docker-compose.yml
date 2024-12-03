@@ -5,6 +5,7 @@ services:
       context: .
       dockerfile: Dockerfile
     env_file: .env
+    restart: always
     environment:
       - API_KEY=$API_KEY
       - ADMIN_CHAT_ID=$ADMIN_CHAT_ID
