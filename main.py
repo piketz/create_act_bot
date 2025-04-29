@@ -15,7 +15,7 @@ import json
 import requests
 import base64
 
-logging.basicConfig(level=logging.INFO, filename="py_log.log", filemode="w")
+logging.basicConfig(level=logging.ERROR, filename="py_log.log", filemode="w")
 
 # Инициализация бота
 dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
@@ -72,6 +72,8 @@ def generate_documents(exelfile, operation, fio_ispolnitel, day, month, year):
     Returns:
         list or None: Список путей к созданным PDF-файлам или None в случае ошибки.
     """
+    logging.info(f"generate_documents exelfile={exelfile}, operation={operation}, fio_ispolnitel={fio_ispolnitel}, day={day}, month={month} , year={year}")
+
     # Загрузка данных из файла Excel
     df = pd.read_excel(exelfile)
 
@@ -98,6 +100,7 @@ def generate_documents(exelfile, operation, fio_ispolnitel, day, month, year):
 
     # Обработка каждой строки данных из файла Excel
     for index, row in df.iterrows():
+
         try:
             # Получение данных из текущей строки
             index_ops = str(row['Объект обслуживания']).split()[0]
@@ -106,6 +109,18 @@ def generate_documents(exelfile, operation, fio_ispolnitel, day, month, year):
             name_file = f"{index_ops}_{str(row['NumberIn'])}_{str(row['Number'])}_{str(row['Задание']).replace('/', '-')}"
             date_str = str(row['Дата создания'])
             date_obj = parser.parse(date_str)
+            logging.debug(f"[generate_documents] Обработка строки {index_ops}: {row}")
+
+            # Проверка длины config_parts перед использованием
+            if len(config_parts) >= 4:
+                model_ke = f'{config_parts[1]} {config_parts[2]} {config_parts[3]}'
+            else:
+                logging.error(f"Недостаточно элементов в config_parts: {config_parts}")
+                model_ke = "        "
+
+            # Проверка значений num_rp и num_im
+            num_rp = str(row['NumberIn']) if pd.notna(row['NumberIn']) else "        "
+            num_im = str(row['Number']) if pd.notna(row['Number']) else "        "
 
             # Добавление строки данных в соответствующую группу по index_ops
             if index_ops not in data_groups:
@@ -122,15 +137,14 @@ def generate_documents(exelfile, operation, fio_ispolnitel, day, month, year):
                 'month_crt': date_obj.month,
                 'year_crt': date_obj.year,
                 'index_adress': str(row['Объект обслуживания']),
-                'model_ke': f'{config_parts[1]} {config_parts[2]} {config_parts[3]}',
+                'model_ke': model_ke,
                 'num_ke': config_parts[0],
                 'work': operation,
-                'num_rp': str(row['NumberIn']),
-                'num_im': str(row['Number'])
+                'num_rp': num_rp, #str(row['NumberIn']),
+                'num_im': num_im #str(row['Number'])
             })
         except Exception as e:
-            logging.error(f"Error processing row: {e}")
-            print(f"Error processing row: {e}")
+            logging.exception(f"Error processing row {index_ops}: {row} — {e}")
             return None  # В случае ошибки возвращается None
 
     # Обработка данных для каждого index_ops
@@ -155,10 +169,22 @@ def generate_documents(exelfile, operation, fio_ispolnitel, day, month, year):
                             context[f'num_im_{j}'] = data_row['num_im']
                         else:
                             context[key] = value
+                # Вместо отдельных model_ke_1, model_ke_2 ... создайте список словарей
+                devices = []
+                for j, data_row in enumerate(data_chunk, start=1):
+                    devices.append({
+                        'model_ke': safe_str(data_row.get('model_ke')),
+                        'num_ke': safe_str(data_row.get('num_ke')),
+                        'serial_number': safe_str(data_row.get('serial_number')),
+                        'num_rp': safe_str(data_row.get('num_rp')),
+                        'num_im': safe_str(data_row.get('num_im')),
+                    })
+                context['devices'] = devices
 
                 # Создание PDF-файла на основе текущей группы данных
+                logging.info(f"[generate_documents] Генерация PDF для index_ops={index_ops}, срез {i}–{i + 7}")
                 file_path = one_pdf_crt(context)
-           #     print(f'context = {context}')
+                logging.info(f"[generate_documents] Результат one_pdf_crt: {file_path}")
                 if file_path:
                     generated_docs_index_ops.append(file_path)
 
@@ -175,42 +201,50 @@ def generate_documents(exelfile, operation, fio_ispolnitel, day, month, year):
     # Возвращение списка путей к созданным PDF-файлам
     return generated_docs
 
+def safe_str(value):
+    return '' if pd.isna(value) or value in [None, 'nan', 'NaN'] else str(value)
 
 def one_pdf_crt(context):
-    #url = 'http://gooduser:secretpassword@wkhtmltopdf:5555/'
-    #url = 'http://gooduser:secretpassword@localhost:5552/'
-    url = 'http://gooduser:secretpassword@192.168.1.229:5552/'
-    template_loader = jinja2.FileSystemLoader('./')
-    template_env = jinja2.Environment(loader=template_loader)
-    template = template_env.get_template('template.html')
-    context = {k: v for k, v in context.items() if v is not None}
-    output_text = template.render(context)
-    encoded_content = base64.b64encode(output_text.encode('utf-8')).decode('utf-8')
+    logging.info(f"[one_pdf_crt] Начало генерации PDF для файла: {context.get('name_file', 'unknown')}")
+    try:
+        url = 'http://gooduser:secretpassword@192.168.1.229:5552/'
+        logging.info(f"[one_pdf_crt] URL для генерации PDF: {url}")
 
-    data = {
-        'contents': encoded_content,
-        'options': {
-            'enable-local-file-access': '',
-            'margin-top': '6',
-            'margin-right': '6',
-            'margin-bottom': '6',
-            'margin-left': '6',
-            'page-size': 'A3',
-           # 'page-width': '300mm',
-          #  'page-height': '450mm',
+        template_loader = jinja2.FileSystemLoader('./')
+        template_env = jinja2.Environment(loader=template_loader)
+        template = template_env.get_template('template.html')
+        context = {k: v for k, v in context.items() if v is not None}
+        output_text = template.render(context)
 
+        encoded_content = base64.b64encode(output_text.encode('utf-8')).decode('utf-8')
+
+        data = {
+            'contents': encoded_content,
+            'options': {
+                'enable-local-file-access': '',
+                'margin-top': '6',
+                'margin-right': '6',
+                'margin-bottom': '6',
+                'margin-left': '6',
+                'page-size': 'A3',
+            }
         }
-    }
 
-    response = requests.post(url, data=json.dumps(data), headers={'Content-Type': 'application/json'})
+        logging.debug(f"[one_pdf_crt] Отправляем запрос на PDF-сервер...")
+        response = requests.post(url, data=json.dumps(data), headers={'Content-Type': 'application/json'})
+        logging.debug(f"[one_pdf_crt] Ответ от сервера: код {response.status_code}")
 
-    if response.status_code == 200:
-        pdf_path = os.path.join(tempfile.mkdtemp(), f"{context['name_file']}.pdf")
-        with open(pdf_path, 'wb') as f:
-            f.write(response.content)
-        return pdf_path
-    else:
-        logging.error(f'Error: {response.status_code}')
+        if response.status_code == 200:
+            pdf_path = os.path.join(tempfile.mkdtemp(), f"{context['name_file']}.pdf")
+            with open(pdf_path, 'wb') as f:
+                f.write(response.content)
+            logging.info(f"[one_pdf_crt] PDF создан: {pdf_path}")
+            return pdf_path
+        else:
+            logging.error(f"[one_pdf_crt] Ошибка при генерации PDF. Код: {response.status_code}, Тело: {response.text}")
+            return None
+    except Exception as e:
+        logging.exception(f"[one_pdf_crt] Исключение при генерации PDF: {e}")
         return None
 
 
@@ -363,7 +397,10 @@ def ask_for_name(message, file_path, date, operation):
                                           f"Дата подписания акта: {date} "
                                           f"Подождите, я создам PDF с данными...", reply_markup=types.ReplyKeyboardRemove())
 
+    logging.info(f"[ask_for_name] Старт генерации документов")
     generated_docs = generate_documents(file_path, operation, fio_ispolnitel, day, month, year)
+    logging.info(f"[ask_for_name] Результат generate_documents: {generated_docs}")
+
     if generated_docs == None:
         logging.error(f'error format generated_docs = {generated_docs}')
         bot.send_message(message.chat.id, "Произошла ошибка при обработке файла 1", reply_markup=types.ReplyKeyboardRemove())
@@ -391,7 +428,9 @@ def ask_for_name(message, file_path, date, operation):
         bot.send_document(admin_chat_id, open(merged_pdf_file, 'rb'), caption=admin_message)
 
 def dev_test_create(message, file_path):
+    logging.info(f"[dev_test_create] Тестовая генерация документов началась.")
     generated_docs = generate_documents(file_path, 'Test', 'Иванов А.А', '01', '01', '1991')
+    logging.info(f"[dev_test_create] Результат generate_documents: {generated_docs}")
     if generated_docs == None:
         logging.error(f'error format generated_docs = {generated_docs}')
         bot.send_message(message.chat.id, "Произошла ошибка при обработке файла 2", reply_markup=types.ReplyKeyboardRemove())
@@ -441,6 +480,9 @@ def get_folder_size(folder_path):
 if __name__ == '__main__':
     if get_folder_size(downloads_folder) > max_folder_size:  remove_file(downloads_folder)
     if get_folder_size(generated_folder) > max_folder_size:  remove_file(generated_folder)
+    if not os.path.exists('template.html'):
+        logging.critical("template.html не найден!")
+
     bot.send_message(admin_chat_id, f'Run bot on: <i>{datetime.now().strftime("%H:%M:%S %d.%m.%Y")}</i>',
                      parse_mode='HTML')
     logging.info('Run..')
