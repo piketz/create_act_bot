@@ -43,8 +43,7 @@ def check_file_content(exelfile):
         df = pd.read_excel(exelfile)
 
         # Проверка наличия конкретных столбцов в файле
-        required_columns = ['Дата создания', 'Конфигурационная единица', 'Объект обслуживания',
-                             'NumberIn', 'Number', 'Задание']
+        required_columns = ['Дата создания', 'Конфигурационная единица', 'Объект обслуживания']
 
         if not set(required_columns).issubset(set(df.columns)):
             logging.error(f"File does not contain all required columns: {required_columns}")
@@ -272,8 +271,8 @@ def start(message):
 def handle_text(message):
     bot.send_message(message.chat.id, "Пожалуйста, отправьте мне Excel-файл, выгруженный из remo.itsm365.com "
                                       "c столбцами: Задание,	Описание (RTF),	Адрес,	Объект обслуживания,"
-                                      "	Статус,	Крайний срок решения,	Дата создания,	Number,	NumberIn,	"
-                                      "Конфигурационная единица ", reply_markup=types.ReplyKeyboardRemove())
+                                      "	Статус,	Крайний срок решения,	Дата создания,	Number,	NumberIn, "
+                                      "incomingNumber, Конфигурационная единица для ТО надо ещё incomingNumber", reply_markup=types.ReplyKeyboardRemove())
 
 
 # Обработчик загрузки документов (Excel-файлов)
@@ -373,15 +372,17 @@ def ask_for_date(message, file_path):
 
 # Функция для запроса operation
 def ask_for_operation(message, file_path, date):
-    markup = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
-    leave_empty_button = types.KeyboardButton('Оставить пусто')
-    markup.add(leave_empty_button)
-
     if message.text == 'Оставить пусто':
         operation = ""
     else:
         operation = message.text
-    bot.send_message(message.chat.id, "Спасибо! Теперь укажите ФИО исполнителя:",reply_markup=markup)
+    markup = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
+    fio_list = ["Медведев К.А.", "Боровиков И.А.", "Дорофеев С.С"]  # Замените на нужные ФИО
+    for fio in fio_list:
+        markup.add(types.KeyboardButton(fio))
+    markup.add(types.KeyboardButton("Оставить пусто"))
+
+    bot.send_message(message.chat.id, "Спасибо! Теперь укажите ФИО исполнителя:", reply_markup=markup)
     bot.register_next_step_handler(message, ask_for_name, file_path, date, operation)
 
 
@@ -394,16 +395,17 @@ def ask_for_name(message, file_path, date, operation):
         year = None if date.year == '____' else date.year
     else:
         day, month, year = None, None, None
-    if message.text == 'Оставить пусто':
-        fio_ispolnitel = "_____________"
-        bot.send_message(message.chat.id, f"Спасибо! Вы не указали исполнителя. Оказанные услуги: {operation} "
-                                          f"Дата подписания акта: {date} "
-                                          f"Подождите, я создам PDF с данными...", reply_markup=types.ReplyKeyboardRemove())
-    else:
-        fio_ispolnitel = message.text
-        bot.send_message(message.chat.id, f"Спасибо! Вы указали ФИО: {fio_ispolnitel}. Оказанные услуги: {operation} "
-                                          f"Дата подписания акта: {date} "
-                                          f"Подождите, я создам PDF с данными...", reply_markup=types.ReplyKeyboardRemove())
+
+    fio_ispolnitel = message.text if message.text != 'Оставить пусто' else "_____________"
+
+    bot.send_message(
+        message.chat.id,
+        f"Спасибо! Вы {'не указали исполнителя' if fio_ispolnitel == '_____________' else f'указали ФИО: {fio_ispolnitel}'}. "
+        f"Оказанные услуги: {operation} "
+        f"Дата подписания акта: {date} "
+        f"Подождите, я создам PDF с данными...",
+        reply_markup=types.ReplyKeyboardRemove()
+    )
 
     logging.info(f"[ask_for_name] Старт генерации документов")
     generated_docs = generate_documents(file_path, operation, fio_ispolnitel, day, month, year)
