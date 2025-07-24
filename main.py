@@ -119,7 +119,15 @@ def generate_documents(exelfile, operation, fio_ispolnitel, day, month, year):
                 model_ke = "        "
 
             # Проверка значений num_rp и num_im
-            num_rp = str(row['NumberIn']) if pd.notna(row['NumberIn']) else "        "
+            #num_rp = str(row['NumberIn']) if pd.notna(row['NumberIn']) else "        "
+            num_in_val = row.get('NumberIn')
+            incoming_val = row.get('incomingNumber')
+            if pd.notna(num_in_val) and str(num_in_val).strip():
+                num_rp = str(num_in_val)
+            elif pd.notna(incoming_val) and str(incoming_val).strip():
+                num_rp = str(incoming_val)
+            else:
+                num_rp = "        "
             num_im = str(row['Number']) if pd.notna(row['Number']) else "        "
 
             # Добавление строки данных в соответствующую группу по index_ops
